@@ -12,8 +12,9 @@ import pandas as pd
 
 from bokeh.colors import RGB
 from bokeh.colors.named import (
-    lime as BULL_COLOR,
-    tomato as BEAR_COLOR
+    darkcyan as BULL_COLOR,
+    orangered as BEAR_COLOR,
+    gold as VOLUME_COLOR,
 )
 from bokeh.plotting import figure as _figure
 from bokeh.models import (
@@ -170,6 +171,7 @@ def plot(*, results: pd.Series,
          smooth_equity=False, relative_equity=True,
          superimpose=True, resample=True,
          reverse_indicators=True,
+         initial_display_range = 90,
          show_legend=True, open_browser=True):
     """
     Like much of GUI code everywhere, this is a mess.
@@ -208,7 +210,7 @@ def plot(*, results: pd.Series,
     df = df.reset_index(drop=True)
     equity_data = equity_data.reset_index(drop=True)
     index = df.index
-
+    
     new_bokeh_figure = partial(
         _figure,
         x_axis_type='linear',
@@ -221,7 +223,7 @@ def plot(*, results: pd.Series,
     pad = (index[-1] - index[0]) / 20
 
     fig_ohlc = new_bokeh_figure(
-        x_range=Range1d(index[0], index[-1],
+        x_range=Range1d(index[-1*initial_display_range], index[-1] + 1,
                         min_interval=10,
                         bounds=(index[0] - pad,
                                 index[-1] + pad)) if index.size > 1 else None)
@@ -380,7 +382,7 @@ return this.labels[index] || "";
                  legend_label=f'Max Dd Dur. ({dd_timedelta_label})'
                  .replace(' 00:00:00', '')
                  .replace('(0 days ', '('))
-
+        
         figs_above_ohlc.append(fig)
 
     def _plot_drawdown_section():
@@ -428,10 +430,11 @@ return this.labels[index] || "";
     def _plot_volume_section():
         """Volume section"""
         fig = new_indicator_figure(y_axis_label="Volume")
+        fig.y_range=Range1d(0,source.data['Volume'][-1*initial_display_range:].max() * 1.03)
         fig.xaxis.formatter = fig_ohlc.xaxis[0].formatter
         fig.xaxis.visible = True
-        fig_ohlc.xaxis.visible = False  # Show only Volume's xaxis
-        r = fig.vbar('index', BAR_WIDTH, 'Volume', source=source, color=inc_cmap)
+        fig_ohlc.xaxis.visible = True  # Show only Volume's xaxis
+        r = fig.vbar('index', BAR_WIDTH, 'Volume', source=source, color=VOLUME_COLOR)
         set_tooltips(fig, [('Volume', '@Volume{0.00 a}')], renderers=[r])
         fig.yaxis.formatter = NumeralTickFormatter(format="0 a")
         return fig
@@ -473,17 +476,18 @@ return this.labels[index] || "";
         df2['inc'] = (df2.Close >= df2.Open).astype(int).astype(str)
         df2.index.name = None
         source2 = ColumnDataSource(df2)
-        fig_ohlc.segment('index', 'High', 'index', 'Low', source=source2, color='#bbbbbb')
+        #fig_ohlc.segment('index', 'High', 'index', 'Low', source=source2, color=BEAR_COLOR)
         colors_lighter = [lightness(BEAR_COLOR, .92),
                           lightness(BULL_COLOR, .92)]
+        fig_ohlc.segment('index', 'High', 'index', 'Low', source=source2, color=factor_cmap('inc', colors_lighter, ['0', '1']), line_width = 2)
         fig_ohlc.vbar('index', '_width', 'Open', 'Close', source=source2, line_color=None,
                       fill_color=factor_cmap('inc', colors_lighter, ['0', '1']))
 
     def _plot_ohlc():
         """Main OHLC bars"""
-        fig_ohlc.segment('index', 'High', 'index', 'Low', source=source, color="black")
+        fig_ohlc.segment('index', 'High', 'index', 'Low', source=source, color=inc_cmap)
         r = fig_ohlc.vbar('index', BAR_WIDTH, 'Open', 'Close', source=source,
-                          line_color="black", fill_color=inc_cmap)
+                          line_color=inc_cmap, fill_color=inc_cmap)
         return r
 
     def _plot_ohlc_trades():
@@ -619,6 +623,11 @@ return this.labels[index] || "";
 
     source.add(ohlc_extreme_values.min(1), 'ohlc_low')
     source.add(ohlc_extreme_values.max(1), 'ohlc_high')
+
+    ohlc_extreme_values_describe = ohlc_extreme_values[-90:].describe()
+    init_yrange_pad = max((ohlc_extreme_values_describe['High']['max'] - ohlc_extreme_values_describe['Low']['min']) * .03, 0)
+
+    fig_ohlc.y_range=Range1d(ohlc_extreme_values_describe['Low']['min'] - init_yrange_pad, ohlc_extreme_values_describe['High']['max'] + init_yrange_pad)
 
     custom_js_args = dict(ohlc_range=fig_ohlc.y_range,
                           source=source)
