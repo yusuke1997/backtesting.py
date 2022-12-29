@@ -433,7 +433,7 @@ return this.labels[index] || "";
         fig.y_range=Range1d(0,source.data['Volume'][-1*initial_display_range:].max() * 1.03)
         fig.xaxis.formatter = fig_ohlc.xaxis[0].formatter
         fig.xaxis.visible = True
-        fig_ohlc.xaxis.visible = True  # Show only Volume's xaxis
+        fig_ohlc.xaxis.visible = False  # Show only Volume's xaxis
         r = fig.vbar('index', BAR_WIDTH, 'Volume', source=source, color=VOLUME_COLOR)
         set_tooltips(fig, [('Volume', '@Volume{0.00 a}')], renderers=[r])
         fig.yaxis.formatter = NumeralTickFormatter(format="0 a")
